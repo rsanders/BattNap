@@ -57,7 +57,7 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
 		CFStringRef key = CFArrayGetValueAtIndex(changedKeys, i);
         CFDictionaryRef newValue = SCDynamicStoreCopyValue(store, key);
         
-        if (CFGetTypeID(newValue) == CFDictionaryGetTypeID()) {        
+        if (newValue && CFGetTypeID(newValue) == CFDictionaryGetTypeID()) {        
             if (CFStringCompare(key, kLowBatteryWarningKey, 0) == kCFCompareEqualTo) {
                 [self _lowBatteryWarning:newValue];
             }
@@ -134,7 +134,7 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
         int threshold = 10;
         CFNumberRef warningThreshold = CFNumberCreate(NULL, kCFNumberIntType, &threshold);
         CFNumberRef timeToEmpty = CFDictionaryGetValue(_batteryStatus, CFSTR("Time to Empty"));
-        if (CFNumberCompare(timeToEmpty, warningThreshold, NULL) == kCFCompareLessThan) {
+        if (!isPluggedIn && CFNumberCompare(timeToEmpty, warningThreshold, NULL) == kCFCompareLessThan) {
             [self _lowBatteryWarning:_batteryStatus];
         }
     }
