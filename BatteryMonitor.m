@@ -16,9 +16,6 @@ static SCDynamicStoreRef _dynamicStore;
 static CFDictionaryRef _batteryStatus;
 static BOOL isPluggedIn;
 
-static int warningMinutesLeft = 15;
-static int sleepMinutesLeft = 8;
-
 static CFStringRef kLowBatteryWarningKey = CFSTR("State:/IOKit/LowBatteryWarning");
 static CFStringRef kPowerAdapterKey = CFSTR("State:/IOKit/PowerAdapter");
 static CFStringRef kInternalBatteryKey = CFSTR("State:/IOKit/PowerSources/InternalBattery-0");
@@ -51,6 +48,9 @@ static CFStringRef kInternalBatteryKey = CFSTR("State:/IOKit/PowerSources/Intern
 
 
 @implementation BatteryMonitor
+
+@synthesize warningMinutesLeft;
+@synthesize sleepMinutesLeft;
 
 static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *info)
 {
@@ -85,6 +85,10 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
     
     if (self != nil) {
         _delegate = (AppDelegate *)[NSApp delegate];
+        
+        // default times
+        sleepMinutesLeft = 8;
+        warningMinutesLeft = 12;
         
         SCDynamicStoreContext context = {0, self, NULL, NULL, NULL};
         
@@ -143,10 +147,10 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
             
             if (CFNumberCompare(timeToEmpty, sleepThreshold, NULL) == kCFCompareLessThan) {
                 NSLog(@"Forcing sleep!");
-                [self _lowBatterySleep];
+                [_delegate emergencySleep];
             }
             else if (CFNumberCompare(timeToEmpty, warningThreshold, NULL) == kCFCompareLessThan) {
-                [self _lowBatteryWarning:_batteryStatus];
+                [_delegate showLowBatteryWarning];
             }
         }   
     }
@@ -171,11 +175,6 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
 #pragma mark -
 #pragma mark Handle Notifications
 
-- (void)_lowBatterySleep {
-    system("/usr/bin/pmset sleepnow");
-}
-
-
 - (void)_lowBatteryWarning:(CFDictionaryRef)newValue {
     [_delegate showLowBatteryWarning];
 }
@@ -185,7 +184,10 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
     if (newValue) {
         NSInteger currentCapacity = [[(NSDictionary *)newValue objectForKey:@"Current Capacity"] integerValue];
 
-        if (isPluggedIn) {
+        BOOL batteryDischarging = ![[(NSDictionary *)newValue objectForKey:@"Power Source State"] 
+                                   isEqualToString:@"AC Power"];
+        
+        if (! batteryDischarging) {
             NSInteger timeToFullCharge = [self _timeToFullCharge:newValue];
             if (timeToFullCharge <= 0) return;
             NSInteger hours = timeToFullCharge / 60;
@@ -194,12 +196,19 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
         }
         else {
             NSInteger timeToEmpty = [self _timeToEmpty:newValue];
+            
+            // unknown estimated time left (still calculating)
             if (timeToEmpty <= 0) return;
             NSInteger hours = timeToEmpty / 60;
             NSInteger minutes = timeToEmpty - (hours * 60);
             NSLog(@"Current battery charge: %d%%  Estimated time remaining: %d:%02d", currentCapacity, hours, minutes);
             
-            if (timeToEmpty <= 10) [_delegate showLowBatteryWarning];
+            if (timeToEmpty <= sleepMinutesLeft) {
+                [_delegate emergencySleep];   
+            } else if (timeToEmpty <= warningMinutesLeft) {
+                [_delegate showLowBatteryWarning];
+            }
+        
         }
     }
 }
@@ -225,7 +234,7 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
 
 - (NSInteger)_timeToFullCharge:(CFDictionaryRef)dict
 {
-    [[(NSDictionary *)dict objectForKey:@"Time to Full Charge"] integerValue];
+    return [[(NSDictionary *)dict objectForKey:@"Time to Full Charge"] integerValue];
 }
 
 @end

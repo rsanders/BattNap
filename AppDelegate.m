@@ -38,5 +38,13 @@
     return isLowBatteryWarningAlertShowing;
 }
 
+- (void) emergencySleep {
+    [sleepWindow setLevel:NSStatusWindowLevel];
+    [sleepWindow center];
+    isSleepNotificationShowing = YES;
+    [sleepWindow makeKeyAndOrderFront:nil];
+    
+    system("/usr/bin/pmset sleepnow");    
+}
 
 @end

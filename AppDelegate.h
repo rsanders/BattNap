@@ -9,11 +9,16 @@
 @interface AppDelegate : NSObject <NSApplicationDelegate> {
     NSWindow *window;
     BOOL isLowBatteryWarningAlertShowing;
+    BOOL isSleepNotificationShowing;
+    NSWindow *sleepWindow;
+    NSTextField *messageText;
 }
 
 @property (assign) IBOutlet NSWindow *window;
+@property (assign) IBOutlet NSWindow *sleepWindow;
 
 - (void)showLowBatteryWarning;
+- (void)emergencySleep;
 - (IBAction)closeLowBatteryWarning:(id)sender;
 - (BOOL)isLowBatteryWarningShowing;
 

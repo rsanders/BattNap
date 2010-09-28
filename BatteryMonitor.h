@@ -13,6 +13,14 @@
 @interface BatteryMonitor : NSObject {
     CFRunLoopSourceRef _runLoopSource;
     AppDelegate *_delegate;
+    
+    int warningMinutesLeft;
+    int sleepMinutesLeft;
 }
+
+
+@property (assign) int warningMinutesLeft;
+@property (assign) int sleepMinutesLeft;
+
 
 @end
