@@ -16,6 +16,9 @@ static SCDynamicStoreRef _dynamicStore;
 static CFDictionaryRef _batteryStatus;
 static BOOL isPluggedIn;
 
+static int warningMinutesLeft = 15;
+static int sleepMinutesLeft = 8;
+
 static CFStringRef kLowBatteryWarningKey = CFSTR("State:/IOKit/LowBatteryWarning");
 static CFStringRef kPowerAdapterKey = CFSTR("State:/IOKit/PowerAdapter");
 static CFStringRef kInternalBatteryKey = CFSTR("State:/IOKit/PowerSources/InternalBattery-0");
@@ -41,6 +44,7 @@ static CFStringRef kInternalBatteryKey = CFSTR("State:/IOKit/PowerSources/Intern
 - (void)_lowBatteryWarning:(CFDictionaryRef)newValue;
 - (void)_batteryStatusChange:(CFDictionaryRef)newValue;
 - (void)_powerAdapterStatusChange:(CFDictionaryRef)newValue;
+- (void)_lowBatterySleep;
 - (NSInteger)_timeToEmpty:(CFDictionaryRef)dict;
 - (NSInteger)_timeToFullCharge:(CFDictionaryRef)dict;
 @end
@@ -129,14 +133,22 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
         if (CFStringCompare(powerSourceState, CFSTR("AC Power"), 0) == kCFCompareEqualTo) {
             isPluggedIn = YES;
         }
-        
-        // Check if we're already below the battery empty warning threshold
-        int threshold = 10;
-        CFNumberRef warningThreshold = CFNumberCreate(NULL, kCFNumberIntType, &threshold);
-        CFNumberRef timeToEmpty = CFDictionaryGetValue(_batteryStatus, CFSTR("Time to Empty"));
-        if (!isPluggedIn && CFNumberCompare(timeToEmpty, warningThreshold, NULL) == kCFCompareLessThan) {
-            [self _lowBatteryWarning:_batteryStatus];
-        }
+
+        if (! isPluggedIn) {
+            // Check if we're already below the battery empty warning threshold
+
+            CFNumberRef sleepThreshold = CFNumberCreate(NULL, kCFNumberIntType, &sleepMinutesLeft);
+            CFNumberRef warningThreshold = CFNumberCreate(NULL, kCFNumberIntType, &warningMinutesLeft);
+            CFNumberRef timeToEmpty = CFDictionaryGetValue(_batteryStatus, CFSTR("Time to Empty"));
+            
+            if (CFNumberCompare(timeToEmpty, sleepThreshold, NULL) == kCFCompareLessThan) {
+                NSLog(@"Forcing sleep!");
+                [self _lowBatterySleep];
+            }
+            else if (CFNumberCompare(timeToEmpty, warningThreshold, NULL) == kCFCompareLessThan) {
+                [self _lowBatteryWarning:_batteryStatus];
+            }
+        }   
     }
     
     return self;
@@ -158,6 +170,11 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
 
 #pragma mark -
 #pragma mark Handle Notifications
+
+- (void)_lowBatterySleep {
+    system("/usr/bin/pmset sleepnow");
+}
+
 
 - (void)_lowBatteryWarning:(CFDictionaryRef)newValue {
     [_delegate showLowBatteryWarning];
