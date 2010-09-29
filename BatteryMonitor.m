@@ -154,6 +154,11 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
     // Check if we're running on AC power
     BOOL on_ac;
     
+    // skip polling if we're not monitoring - mostly for debugging
+    if ([_delegate monitoringPaused]) {
+        return;
+    }
+    
     NSDictionary *batteryStatus = [self getBatteryStatus];
     NSString * powerSourceState = [batteryStatus valueForKey:@"Power Source State"];
     on_ac = [powerSourceState isEqualToString:@"AC Power"];

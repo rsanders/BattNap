@@ -1621,7 +1621,7 @@
 							<string key="NSTitle">Debug</string>
 							<object class="NSMutableArray" key="NSMenuItems">
 								<bool key="EncodedWithXMLCoder">YES</bool>
-								<object class="NSMenuItem" id="605713869">
+								<object class="NSMenuItem" id="908784004">
 									<reference key="NSMenu" ref="271208104"/>
 									<string key="NSTitle">Debug Mode</string>
 									<string key="NSKeyEquiv"/>
@@ -2585,14 +2585,6 @@ YmVjYXVzZSBvZiBlLmcuIFBHUCBXREUuCgpieSBDdXJpb3VzIFNxdWlkA</string>
 					<int key="connectionID">595</int>
 				</object>
 				<object class="IBConnectionRecord">
-					<object class="IBActionConnection" key="connection">
-						<string key="label">menuTogglePause:</string>
-						<reference key="source" ref="976324537"/>
-						<reference key="destination" ref="604092050"/>
-					</object>
-					<int key="connectionID">596</int>
-				</object>
-				<object class="IBConnectionRecord">
 					<object class="IBBindingConnection" key="connection">
 						<string key="label">value: paused</string>
 						<reference key="source" ref="604092050"/>
@@ -2720,10 +2712,10 @@ YmVjYXVzZSBvZiBlLmcuIFBHUCBXREUuCgpieSBDdXJpb3VzIFNxdWlkA</string>
 				<object class="IBConnectionRecord">
 					<object class="IBBindingConnection" key="connection">
 						<string key="label">value: debugMode</string>
-						<reference key="source" ref="605713869"/>
+						<reference key="source" ref="908784004"/>
 						<reference key="destination" ref="976324537"/>
 						<object class="NSNibBindingConnector" key="connector">
-							<reference key="NSSource" ref="605713869"/>
+							<reference key="NSSource" ref="908784004"/>
 							<reference key="NSDestination" ref="976324537"/>
 							<string key="NSLabel">value: debugMode</string>
 							<string key="NSBinding">value</string>
@@ -4081,7 +4073,7 @@ YmVjYXVzZSBvZiBlLmcuIFBHUCBXREUuCgpieSBDdXJpb3VzIFNxdWlkA</string>
 							<reference ref="841283196"/>
 							<reference ref="157285751"/>
 							<reference ref="223981005"/>
-							<reference ref="605713869"/>
+							<reference ref="908784004"/>
 						</object>
 						<reference key="parent" ref="297798123"/>
 					</object>
@@ -4117,7 +4109,7 @@ YmVjYXVzZSBvZiBlLmcuIFBHUCBXREUuCgpieSBDdXJpb3VzIFNxdWlkA</string>
 					</object>
 					<object class="IBObjectRecord">
 						<int key="objectID">633</int>
-						<reference key="object" ref="605713869"/>
+						<reference key="object" ref="908784004"/>
 						<reference key="parent" ref="271208104"/>
 						<string key="objectName">Menu Item - Debug Mode</string>
 					</object>

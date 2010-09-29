@@ -70,6 +70,8 @@
 }
 
 - (void) showEmergencySleepWarning {
+    if (paused) return;
+    
     [sleepWindow setLevel:NSStatusWindowLevel];
     [sleepWindow center];
     isSleepNotificationShowing = YES;
