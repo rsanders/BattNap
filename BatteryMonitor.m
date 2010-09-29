@@ -41,7 +41,6 @@ static CFStringRef kInternalBatteryKey = CFSTR("State:/IOKit/PowerSources/Intern
 - (void)_lowBatteryWarning:(CFDictionaryRef)newValue;
 - (void)_batteryStatusChange:(CFDictionaryRef)newValue;
 - (void)_powerAdapterStatusChange:(CFDictionaryRef)newValue;
-- (void)_lowBatterySleep;
 - (NSInteger)_timeToEmpty:(CFDictionaryRef)dict;
 - (NSInteger)_timeToFullCharge:(CFDictionaryRef)dict;
 @end
@@ -61,7 +60,7 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
 		CFStringRef key = CFArrayGetValueAtIndex(changedKeys, i);
         CFDictionaryRef newValue = SCDynamicStoreCopyValue(store, key);
         
-        if (newValue && CFGetTypeID(newValue) == CFDictionaryGetTypeID()) {        
+        if (!newValue || CFGetTypeID(newValue) == CFDictionaryGetTypeID()) {        
             if (CFStringCompare(key, kLowBatteryWarningKey, 0) == kCFCompareEqualTo) {
                 [self _lowBatteryWarning:newValue];
             }
@@ -85,7 +84,7 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
     
     if (self != nil) {
         _delegate = (AppDelegate *)[NSApp delegate];
-        
+                
         // default times
         sleepMinutesLeft = 8;
         warningMinutesLeft = 12;
@@ -138,6 +137,9 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
             isPluggedIn = YES;
         }
 
+        _machine = [[SleeperStateMachine alloc] initWithState:(isPluggedIn ? STATE_AC : STATE_BATTERY_NORMAL) 
+                                                     delegate:_delegate];
+        
         if (! isPluggedIn) {
             // Check if we're already below the battery empty warning threshold
 
@@ -147,10 +149,10 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
             
             if (CFNumberCompare(timeToEmpty, sleepThreshold, NULL) == kCFCompareLessThan) {
                 NSLog(@"Forcing sleep!");
-                [_delegate emergencySleep];
+                [_machine batteryCritical];
             }
             else if (CFNumberCompare(timeToEmpty, warningThreshold, NULL) == kCFCompareLessThan) {
-                [_delegate showLowBatteryWarning];
+                [_machine batteryLow];
             }
         }   
     }
@@ -167,6 +169,8 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
 
 	if (_dynamicStore != nil)
 		CFRelease(_dynamicStore);
+    
+    [_machine release];
     
     [super dealloc];
 }
@@ -193,6 +197,7 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
             NSInteger hours = timeToFullCharge / 60;
             NSInteger minutes = timeToFullCharge - (hours * 60);
             NSLog(@"Current battery charge: %d%%  Estimated time until full: %d:%02d", currentCapacity, hours, minutes);
+            [_machine powerChangeToAC];
         }
         else {
             NSInteger timeToEmpty = [self _timeToEmpty:newValue];
@@ -204,9 +209,11 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
             NSLog(@"Current battery charge: %d%%  Estimated time remaining: %d:%02d", currentCapacity, hours, minutes);
             
             if (timeToEmpty <= sleepMinutesLeft) {
-                [_delegate emergencySleep];   
+                [_machine batteryCritical];   
             } else if (timeToEmpty <= warningMinutesLeft) {
-                [_delegate showLowBatteryWarning];
+                [_machine batteryLow];
+            } else {
+                [_machine batteryNormal];
             }
         
         }
@@ -217,6 +224,7 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
 {
     if (newValue != nil) {
         isPluggedIn = YES;
+        [_machine powerChangeToAC];
         
         if ([_delegate isLowBatteryWarningShowing]) {
             [_delegate closeLowBatteryWarning:nil];
@@ -224,6 +232,7 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
     }
     else {
         isPluggedIn = NO;
+        [_machine powerChangeToBattery];
     }
 }
 

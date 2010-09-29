@@ -8,11 +8,13 @@
 
 #import <SystemConfiguration/SystemConfiguration.h>
 #import "AppDelegate.h"
-
+#import "SleeperStateMachine.h"
 
 @interface BatteryMonitor : NSObject {
     CFRunLoopSourceRef _runLoopSource;
     AppDelegate *_delegate;
+    
+    SleeperStateMachine *_machine;
     
     int warningMinutesLeft;
     int sleepMinutesLeft;

@@ -13,6 +13,7 @@
 @implementation AppDelegate
 
 @synthesize window;
+@synthesize sleepWindow;
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
     BatteryMonitor *monitor = [[BatteryMonitor alloc] init];
