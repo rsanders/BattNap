@@ -23,6 +23,6 @@
 
 @property (assign) int warningMinutesLeft;
 @property (assign) int sleepMinutesLeft;
-
+@property (retain) SleeperStateMachine *machine;
 
 @end

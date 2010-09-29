@@ -37,23 +37,17 @@ static CFStringRef kInternalBatteryKey = CFSTR("State:/IOKit/PowerSources/Intern
     "Transport Type" = Internal;
  */
 
-@interface BatteryMonitor ()
-- (void)_lowBatteryWarning:(CFDictionaryRef)newValue;
-- (void)_batteryStatusChange:(CFDictionaryRef)newValue;
-- (void)_powerAdapterStatusChange:(CFDictionaryRef)newValue;
-- (NSInteger)_timeToEmpty:(CFDictionaryRef)dict;
-- (NSInteger)_timeToFullCharge:(CFDictionaryRef)dict;
-@end
-
 
 @implementation BatteryMonitor
 
 @synthesize warningMinutesLeft;
 @synthesize sleepMinutesLeft;
+@synthesize machine = _machine;
 
 static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *info)
 {
 	BatteryMonitor *self = info;
+    SleeperStateMachine *machine = self.machine;
 
 	CFIndex count = CFArrayGetCount(changedKeys);
 	for (CFIndex i = 0; i < count; ++i) {
@@ -62,13 +56,13 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
         
         if (!newValue || CFGetTypeID(newValue) == CFDictionaryGetTypeID()) {        
             if (CFStringCompare(key, kLowBatteryWarningKey, 0) == kCFCompareEqualTo) {
-                [self _lowBatteryWarning:newValue];
+                [machine _lowBatteryWarning:newValue];
             }
             else if (CFStringCompare(key, kPowerAdapterKey, 0) == kCFCompareEqualTo) {
-                [self _powerAdapterStatusChange:newValue];
+                [machine _powerAdapterStatusChange:newValue];
             }
             else if (CFStringCompare(key, kInternalBatteryKey, 0) == kCFCompareEqualTo) {
-                [self _batteryStatusChange:newValue];
+                [machine _batteryStatusChange:newValue];
             }
         }
 
@@ -129,32 +123,32 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
         CFRelease(_runLoopSource);
         
         _batteryStatus = SCDynamicStoreCopyValue(_dynamicStore, kInternalBatteryKey);
-        [self _batteryStatusChange:_batteryStatus];
         
-        // Check if we're running on AC power
-        CFStringRef powerSourceState = CFDictionaryGetValue(_batteryStatus, CFSTR("Power Source State"));
-        if (CFStringCompare(powerSourceState, CFSTR("AC Power"), 0) == kCFCompareEqualTo) {
-            isPluggedIn = YES;
-        }
+//        // Check if we're running on AC power
+//        CFStringRef powerSourceState = CFDictionaryGetValue(_batteryStatus, CFSTR("Power Source State"));
+//        if (CFStringCompare(powerSourceState, CFSTR("AC Power"), 0) == kCFCompareEqualTo) {
+//            isPluggedIn = YES;
+//        }
 
         _machine = [[SleeperStateMachine alloc] initWithState:(isPluggedIn ? STATE_AC : STATE_BATTERY_NORMAL) 
                                                      delegate:_delegate];
-        
-        if (! isPluggedIn) {
-            // Check if we're already below the battery empty warning threshold
+        [_machine _batteryStatusChange:_batteryStatus];
 
-            CFNumberRef sleepThreshold = CFNumberCreate(NULL, kCFNumberIntType, &sleepMinutesLeft);
-            CFNumberRef warningThreshold = CFNumberCreate(NULL, kCFNumberIntType, &warningMinutesLeft);
-            CFNumberRef timeToEmpty = CFDictionaryGetValue(_batteryStatus, CFSTR("Time to Empty"));
-            
-            if (CFNumberCompare(timeToEmpty, sleepThreshold, NULL) == kCFCompareLessThan) {
-                NSLog(@"Forcing sleep!");
-                [_machine batteryCritical];
-            }
-            else if (CFNumberCompare(timeToEmpty, warningThreshold, NULL) == kCFCompareLessThan) {
-                [_machine batteryLow];
-            }
-        }   
+//        if (! isPluggedIn) {
+//            // Check if we're already below the battery empty warning threshold
+//
+//            CFNumberRef sleepThreshold = CFNumberCreate(NULL, kCFNumberIntType, &sleepMinutesLeft);
+//            CFNumberRef warningThreshold = CFNumberCreate(NULL, kCFNumberIntType, &warningMinutesLeft);
+//            CFNumberRef timeToEmpty = CFDictionaryGetValue(_batteryStatus, CFSTR("Time to Empty"));
+//            
+//            if (CFNumberCompare(timeToEmpty, sleepThreshold, NULL) == kCFCompareLessThan) {
+//                NSLog(@"Forcing sleep!");
+//                [_machine batteryCritical];
+//            }
+//            else if (CFNumberCompare(timeToEmpty, warningThreshold, NULL) == kCFCompareLessThan) {
+//                [_machine batteryLow];
+//            }
+//        }   
     }
     
     return self;
@@ -175,75 +169,5 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
     [super dealloc];
 }
 
-
-#pragma mark -
-#pragma mark Handle Notifications
-
-- (void)_lowBatteryWarning:(CFDictionaryRef)newValue {
-    [_delegate showLowBatteryWarning];
-}
-
-- (void)_batteryStatusChange:(CFDictionaryRef)newValue
-{
-    if (newValue) {
-        NSInteger currentCapacity = [[(NSDictionary *)newValue objectForKey:@"Current Capacity"] integerValue];
-
-        BOOL batteryDischarging = ![[(NSDictionary *)newValue objectForKey:@"Power Source State"] 
-                                   isEqualToString:@"AC Power"];
-        
-        if (! batteryDischarging) {
-            NSInteger timeToFullCharge = [self _timeToFullCharge:newValue];
-            if (timeToFullCharge <= 0) return;
-            NSInteger hours = timeToFullCharge / 60;
-            NSInteger minutes = timeToFullCharge - (hours * 60);
-            NSLog(@"Current battery charge: %d%%  Estimated time until full: %d:%02d", currentCapacity, hours, minutes);
-            [_machine powerChangeToAC];
-        }
-        else {
-            NSInteger timeToEmpty = [self _timeToEmpty:newValue];
-            
-            // unknown estimated time left (still calculating)
-            if (timeToEmpty <= 0) return;
-            NSInteger hours = timeToEmpty / 60;
-            NSInteger minutes = timeToEmpty - (hours * 60);
-            NSLog(@"Current battery charge: %d%%  Estimated time remaining: %d:%02d", currentCapacity, hours, minutes);
-            
-            if (timeToEmpty <= sleepMinutesLeft) {
-                [_machine batteryCritical];   
-            } else if (timeToEmpty <= warningMinutesLeft) {
-                [_machine batteryLow];
-            } else {
-                [_machine batteryNormal];
-            }
-        
-        }
-    }
-}
-
-- (void)_powerAdapterStatusChange:(CFDictionaryRef)newValue
-{
-    if (newValue != nil) {
-        isPluggedIn = YES;
-        [_machine powerChangeToAC];
-        
-        if ([_delegate isLowBatteryWarningShowing]) {
-            [_delegate closeLowBatteryWarning:nil];
-        }
-    }
-    else {
-        isPluggedIn = NO;
-        [_machine powerChangeToBattery];
-    }
-}
-
-- (NSInteger)_timeToEmpty:(CFDictionaryRef)dict
-{
-    return [[(NSDictionary *)dict objectForKey:@"Time to Empty"] integerValue];
-}
-
-- (NSInteger)_timeToFullCharge:(CFDictionaryRef)dict
-{
-    return [[(NSDictionary *)dict objectForKey:@"Time to Full Charge"] integerValue];
-}
 
 @end

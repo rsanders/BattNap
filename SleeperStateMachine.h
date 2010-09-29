@@ -65,12 +65,21 @@ typedef enum {
     sstate_t    state;
     SleeperStateObject  *handler;
     AppDelegate *delegate;
+    int warningMinutesLeft;
+    int sleepMinutesLeft;
 }
+
+@property (assign) int warningMinutesLeft;
+@property (assign) int sleepMinutesLeft;
 
 @property (assign) sstate_t state;
 @property (retain) SleeperStateObject *handler;
 @property (assign) AppDelegate *delegate;
 
 - (SleeperStateMachine*) initWithState:(sstate_t)state delegate:(AppDelegate*)delegate;
+
+- (void)_lowBatteryWarning:(CFDictionaryRef)newValue;
+- (void)_batteryStatusChange:(CFDictionaryRef)newValue;
+- (void)_powerAdapterStatusChange:(CFDictionaryRef)newValue;
 
 @end

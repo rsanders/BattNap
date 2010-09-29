@@ -13,6 +13,8 @@
 @synthesize handler;
 @synthesize state;
 @synthesize delegate;
+@synthesize warningMinutesLeft;
+@synthesize sleepMinutesLeft;
 
 @interface SleeperStateMachine (Private)
 - (sstate_t) newState:(sstate_t)new_state;
@@ -24,6 +26,10 @@
     self.state = STATE_NO_CHANGE;
     [self newState:_state];
     self.delegate = _delegate;
+    
+    self.warningMinutesLeft = 15;
+    self.sleepMinutesLeft = 8;
+    
     return self;
 }
 
@@ -41,6 +47,71 @@
     [self.handler enterFromState:old_state];
     return new_state;
 }
+
+// old
+
+- (NSInteger)_timeToEmpty:(CFDictionaryRef)dict
+{
+    return [[(NSDictionary *)dict objectForKey:@"Time to Empty"] integerValue];
+}
+
+- (NSInteger)_timeToFullCharge:(CFDictionaryRef)dict
+{
+    return [[(NSDictionary *)dict objectForKey:@"Time to Full Charge"] integerValue];
+}
+
+
+- (void)_lowBatteryWarning:(CFDictionaryRef)newValue {
+    [self batteryLow];
+}
+
+- (void)_batteryStatusChange:(CFDictionaryRef)newValue
+{
+    if (newValue) {
+        NSInteger currentCapacity = [[(NSDictionary *)newValue objectForKey:@"Current Capacity"] integerValue];
+        
+        BOOL batteryDischarging = ![[(NSDictionary *)newValue objectForKey:@"Power Source State"] 
+                                    isEqualToString:@"AC Power"];
+        
+        if (! batteryDischarging) {
+            NSInteger timeToFullCharge = [self _timeToFullCharge:newValue];
+            if (timeToFullCharge <= 0) return;
+            NSInteger hours = timeToFullCharge / 60;
+            NSInteger minutes = timeToFullCharge - (hours * 60);
+            NSLog(@"Current battery charge: %d%%  Estimated time until full: %d:%02d", currentCapacity, hours, minutes);
+            [self powerChangeToAC];
+        }
+        else {
+            NSInteger timeToEmpty = [self _timeToEmpty:newValue];
+            
+            // unknown estimated time left (still calculating)
+            if (timeToEmpty <= 0) return;
+            NSInteger hours = timeToEmpty / 60;
+            NSInteger minutes = timeToEmpty - (hours * 60);
+            NSLog(@"Current battery charge: %d%%  Estimated time remaining: %d:%02d", currentCapacity, hours, minutes);
+            
+            if (timeToEmpty <= sleepMinutesLeft) {
+                [self batteryCritical];   
+            } else if (timeToEmpty <= warningMinutesLeft) {
+                [self batteryLow];
+            } else {
+                [self batteryNormal];
+            }
+        }
+    }
+}
+
+- (void)_powerAdapterStatusChange:(CFDictionaryRef)newValue
+{
+    if (newValue != nil) {
+        [self powerChangeToAC];
+    }
+    else {
+        [self powerChangeToBattery];
+    }
+}
+
+// old
 
 - (sstate_t) batteryCritical {
     return [self newState:[handler batteryCritical]];
