@@ -276,6 +276,12 @@
 - (sstate_t) batteryNormal {
     return STATE_NO_CHANGE;
 }
+
+// you can't wake up if you're not on AC
+- (sstate_t) hostWake {
+    [machine.delegate emergencySleep];
+    return STATE_NO_CHANGE;
+}
 @end
 
 
