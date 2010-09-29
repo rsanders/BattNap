@@ -7,7 +7,7 @@
 //
 
 #import "SleeperStateMachine.h"
-
+#import "AppDelegate.h"
 
 @implementation SleeperStateMachine
 @synthesize handler;
@@ -29,6 +29,12 @@
     
     self.warningMinutesLeft = 15;
     self.sleepMinutesLeft = 8;
+
+    [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver: self selector:@selector(didWakeNotification:) 
+                                                               name: @"NSWorkspaceDidWakeNotification" object: nil];
+    [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver: self selector:@selector(willSleepNotification:) 
+                                                               name: @"NSWorkspaceWillSleepNotification" object: nil];
+
     
     return self;
 }
@@ -79,7 +85,7 @@
             NSInteger hours = timeToFullCharge / 60;
             NSInteger minutes = timeToFullCharge - (hours * 60);
             NSLog(@"Current battery charge: %d%%  Estimated time until full: %d:%02d", currentCapacity, hours, minutes);
-            [self powerChangeToAC];
+            // [self powerChangeToAC];
         }
         else {
             NSInteger timeToEmpty = [self _timeToEmpty:newValue];
@@ -111,7 +117,25 @@
     }
 }
 
-// old
+- (void)didWakeNotification:(NSNotification *)notification {
+    [self hostWake];
+    NSLog(@"didWakeNotification: received NSWorkspaceDidWakeNotification");
+}
+
+- (void)willSleepNotification:(NSNotification *)notification{
+    [self hostSleep];
+    NSLog(@"willSleepNotification: received NSWorkspaceWillSleepNotification");
+}
+
+// state machine methods
+
+- (sstate_t) hostSleep {
+    return [self newState:[handler hostSleep]];
+}
+
+- (sstate_t) hostWake {
+    return [self newState:[handler hostWake]];
+}
 
 - (sstate_t) batteryCritical {
     return [self newState:[handler batteryCritical]];
@@ -187,6 +211,16 @@
     NSLog(@"Exiting state %@", [[self class] className]);
 }
 
+- (sstate_t) hostWake {
+    NSLog(@"Host waking up");
+    return STATE_NO_CHANGE;
+}
+
+- (sstate_t) hostSleep {
+    NSLog(@"Host going to sleep");
+    return STATE_NO_CHANGE;
+}
+
 - (sstate_t) batteryCritical {
     return STATE_BATTERY_CRITICAL;
 }
@@ -213,13 +247,58 @@
 @end
 
 @implementation SleeperStateBatteryNormal
+- (sstate_t) powerChangeToBattery {
+    return STATE_BATTERY_NORMAL;
+}
 @end
 
 @implementation SleeperStateBatteryCritical
+- (void) enter
+{
+    NSLog(@"Entering critical battery state, showing dialog and shutting down!");
+    [machine.delegate emergencySleep];
+}
+
+- (void) exit
+{
+    NSLog(@"Exiting critical battery state, hiding dialog!");
+}
+
+- (sstate_t) powerChangeToBattery {
+    return STATE_NO_CHANGE;
+}
+
+// low doesn't take us out of shutdown - that may just be jitter, only AC will take us out of shutdown
+- (sstate_t) batteryLow {
+    return STATE_NO_CHANGE;
+}
+
+- (sstate_t) batteryNormal {
+    return STATE_NO_CHANGE;
+}
 @end
 
+
+
 @implementation SleeperStateBatteryLow
+- (void) enter
+{
+    NSLog(@"Entering low battery state, showing dialog!");
+    [machine.delegate showLowBatteryWarning];
+}
+
+- (void) exit
+{
+    NSLog(@"Exiting low battery state, hiding dialog!");
+    [machine.delegate closeLowBatteryWarning:self];
+}
+
+- (sstate_t) powerChangeToBattery {
+    return STATE_NO_CHANGE;
+}
 @end
+
+
 
 @implementation SleeperStateAsleep
 @end

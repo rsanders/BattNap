@@ -26,6 +26,8 @@ typedef enum {
 - (sstate_t) batteryNormal;
 - (sstate_t) powerChangeToAC;
 - (sstate_t) powerChangeToBattery;
+- (sstate_t) hostWake;
+- (sstate_t) hostSleep;
 @end
 
 @interface SleeperStateObject : NSObject <SleepEventHandler> {

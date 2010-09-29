@@ -37,6 +37,7 @@ static CFStringRef kInternalBatteryKey = CFSTR("State:/IOKit/PowerSources/Intern
     "Transport Type" = Internal;
  */
 
+// http://www.cocoabuilder.com/archive/cocoa/196169-unable-to-get-event-for-shutdown-restart-using-qa1340.html
 
 @implementation BatteryMonitor
 
@@ -124,15 +125,18 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
         
         _batteryStatus = SCDynamicStoreCopyValue(_dynamicStore, kInternalBatteryKey);
         
-//        // Check if we're running on AC power
-//        CFStringRef powerSourceState = CFDictionaryGetValue(_batteryStatus, CFSTR("Power Source State"));
-//        if (CFStringCompare(powerSourceState, CFSTR("AC Power"), 0) == kCFCompareEqualTo) {
-//            isPluggedIn = YES;
-//        }
+
 
         _machine = [[SleeperStateMachine alloc] initWithState:(isPluggedIn ? STATE_AC : STATE_BATTERY_NORMAL) 
                                                      delegate:_delegate];
-        [_machine _batteryStatusChange:_batteryStatus];
+
+        // Check if we're running on AC power
+        CFStringRef powerSourceState = CFDictionaryGetValue(_batteryStatus, CFSTR("Power Source State"));
+        if (CFStringCompare(powerSourceState, CFSTR("AC Power"), 0) == kCFCompareEqualTo) {
+            [_machine powerChangeToAC];
+        } else {
+            [_machine _batteryStatusChange:_batteryStatus];
+        }
 
 //        if (! isPluggedIn) {
 //            // Check if we're already below the battery empty warning threshold
