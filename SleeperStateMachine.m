@@ -20,37 +20,41 @@
 - (sstate_t) newState:(sstate_t)new_state;
 @end
 
-- (SleeperStateMachine*) initWithState:(sstate_t)_state delegate:(AppDelegate*)_delegate
+#define CRITICAL_TIMEOUT_SECONDS 15
+
+- (SleeperStateMachine*) initWithState:(sstate_t)_initState delegate:(AppDelegate*)_delegate
 {
     self = [super init];
-    self.state = STATE_NO_CHANGE;
-    [self newState:_state];
+    state = STATE_NO_CHANGE;
+    previous_state = STATE_NO_CHANGE;
+    [self newState:_initState];
     self.delegate = _delegate;
     
     self.warningMinutesLeft = 15;
     self.sleepMinutesLeft = 8;
-
-    [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver: self selector:@selector(didWakeNotification:) 
-                                                               name: @"NSWorkspaceDidWakeNotification" object: nil];
-    [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver: self selector:@selector(willSleepNotification:) 
-                                                               name: @"NSWorkspaceWillSleepNotification" object: nil];
-
     
     return self;
 }
 
 - (sstate_t) newState:(sstate_t)new_state {
     // same old same old
+    if (new_state == STATE_PREVIOUS) {
+        new_state = previous_state;
+    }
+    
     if (new_state == STATE_NO_CHANGE || new_state == self.state) {
         return self.state;
     }
-    sstate_t old_state = self.state;
+    
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(timerElapsed) object:nil];
+
+    previous_state = self.state;
     if (self.handler) {
         [self.handler exit];
     }
     self.handler = [SleeperStateObject objectForState:new_state machine:self];
     self.state = new_state;
-    [self.handler enterFromState:old_state];
+    [self.handler enterFromState:previous_state];
     return new_state;
 }
 
@@ -117,16 +121,6 @@
     }
 }
 
-- (void)didWakeNotification:(NSNotification *)notification {
-    [self hostWake];
-    NSLog(@"didWakeNotification: received NSWorkspaceDidWakeNotification");
-}
-
-- (void)willSleepNotification:(NSNotification *)notification{
-    [self hostSleep];
-    NSLog(@"willSleepNotification: received NSWorkspaceWillSleepNotification");
-}
-
 // state machine methods
 
 - (sstate_t) hostSleep {
@@ -157,6 +151,13 @@
     return [self newState:[handler powerChangeToBattery]];
 }
 
+- (sstate_t) timerElapsed {
+    return [self newState:[handler timerElapsed]];    
+}
+
+- (sstate_t) requestDelay {
+    return [self newState:[handler requestDelay]];    
+}
 @end
 
 
@@ -190,6 +191,9 @@
         case STATE_BATTERY_NORMAL:
             obj = [[SleeperStateBatteryNormal alloc] init];
             break;
+        case STATE_DELAY1:
+            obj = [[SleeperStateDelay1 alloc] init];
+            break;
         default:
             NSLog(@"Unknown state: %d", state);
             assert(false);
@@ -218,7 +222,7 @@
 
 - (sstate_t) hostSleep {
     NSLog(@"Host going to sleep");
-    return STATE_NO_CHANGE;
+    return STATE_ASLEEP;
 }
 
 - (sstate_t) batteryCritical {
@@ -240,23 +244,46 @@
 - (sstate_t) powerChangeToBattery {
     return STATE_BATTERY_NORMAL;
 }
+
+- (sstate_t) timerElapsed {
+    NSLog(@"timer elapsed outside of critical section");
+    return STATE_NO_CHANGE;
+}
+
+- (sstate_t) requestDelay {
+    return STATE_NO_CHANGE;
+}
+
 @end
 
 
 @implementation SleeperStateAC
+- (void) enter {
+    [machine.delegate hideAllNotifications];
+}
 @end
 
 @implementation SleeperStateBatteryNormal
+- (void) enter {
+    [machine.delegate hideAllNotifications];
+}
+
 - (sstate_t) powerChangeToBattery {
     return STATE_BATTERY_NORMAL;
 }
 @end
 
 @implementation SleeperStateBatteryCritical
+- (void) scheduleShutdown {
+    [machine performSelector:@selector(timerElapsed) withObject:nil afterDelay:(NSTimeInterval)CRITICAL_TIMEOUT_SECONDS];
+}
+
 - (void) enter
 {
     NSLog(@"Entering critical battery state, showing dialog and shutting down!");
-    [machine.delegate emergencySleep];
+    [machine.delegate hideAllNotifications];
+    [machine.delegate showEmergencySleepWarning];
+    [self scheduleShutdown];
 }
 
 - (void) exit
@@ -279,9 +306,20 @@
 
 // you can't wake up if you're not on AC
 - (sstate_t) hostWake {
+    [self scheduleShutdown];
+    return STATE_NO_CHANGE;
+}
+
+- (sstate_t) timerElapsed {
     [machine.delegate emergencySleep];
     return STATE_NO_CHANGE;
 }
+
+- (sstate_t) requestDelay {
+    NSLog(@"delay requested");
+    return STATE_DELAY1;
+}
+
 @end
 
 
@@ -290,6 +328,7 @@
 - (void) enter
 {
     NSLog(@"Entering low battery state, showing dialog!");
+    [machine.delegate hideAllNotifications];
     [machine.delegate showLowBatteryWarning];
 }
 
@@ -307,6 +346,49 @@
 
 
 @implementation SleeperStateAsleep
+// should go to previous state
+- (sstate_t) hostWake {
+    NSLog(@"Host waking up");
+    return STATE_PREVIOUS;
+}
 @end
 
 
+@implementation SleeperStateDelay1
+#define DELAY_SECONDS 20
+
+- (void) scheduleShutdown {
+    [machine performSelector:@selector(timerElapsed) withObject:nil afterDelay:(NSTimeInterval)DELAY_SECONDS];
+}
+
+- (void) enter
+{
+    NSLog(@"Entering delayed state");
+    [self scheduleShutdown];
+}
+
+- (void) exit
+{
+    NSLog(@"Exiting delayed state");
+}
+
+- (sstate_t) batteryLow {
+    return STATE_NO_CHANGE;
+}
+
+- (sstate_t) batteryNormal {
+    return STATE_NO_CHANGE;
+}
+
+- (sstate_t) batteryCritical {
+    return STATE_NO_CHANGE;
+}
+
+- (sstate_t) powerChangeToBattery {
+    return STATE_NO_CHANGE;
+}
+
+- (sstate_t) timerElapsed {
+    return STATE_BATTERY_CRITICAL;
+}
+@end

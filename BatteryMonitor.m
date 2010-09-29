@@ -44,12 +44,18 @@ static CFStringRef kInternalBatteryKey = CFSTR("State:/IOKit/PowerSources/Intern
 @synthesize warningMinutesLeft;
 @synthesize sleepMinutesLeft;
 @synthesize machine = _machine;
+@synthesize monitoringPaused;
 
 static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *info)
 {
 	BatteryMonitor *self = info;
     SleeperStateMachine *machine = self.machine;
 
+    if ([self monitoringPaused]) {
+        NSLog(@"Monitoring paused...skipping callback");
+        return;
+    }
+    
 	CFIndex count = CFArrayGetCount(changedKeys);
 	for (CFIndex i = 0; i < count; ++i) {
 		CFStringRef key = CFArrayGetValueAtIndex(changedKeys, i);
@@ -83,6 +89,7 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
         // default times
         sleepMinutesLeft = 8;
         warningMinutesLeft = 12;
+        monitoringPaused = false;
         
         SCDynamicStoreContext context = {0, self, NULL, NULL, NULL};
         
@@ -130,33 +137,106 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
         _machine = [[SleeperStateMachine alloc] initWithState:(isPluggedIn ? STATE_AC : STATE_BATTERY_NORMAL) 
                                                      delegate:_delegate];
 
-        // Check if we're running on AC power
-        CFStringRef powerSourceState = CFDictionaryGetValue(_batteryStatus, CFSTR("Power Source State"));
-        if (CFStringCompare(powerSourceState, CFSTR("AC Power"), 0) == kCFCompareEqualTo) {
-            [_machine powerChangeToAC];
-        } else {
-            [_machine _batteryStatusChange:_batteryStatus];
-        }
 
-//        if (! isPluggedIn) {
-//            // Check if we're already below the battery empty warning threshold
-//
-//            CFNumberRef sleepThreshold = CFNumberCreate(NULL, kCFNumberIntType, &sleepMinutesLeft);
-//            CFNumberRef warningThreshold = CFNumberCreate(NULL, kCFNumberIntType, &warningMinutesLeft);
-//            CFNumberRef timeToEmpty = CFDictionaryGetValue(_batteryStatus, CFSTR("Time to Empty"));
-//            
-//            if (CFNumberCompare(timeToEmpty, sleepThreshold, NULL) == kCFCompareLessThan) {
-//                NSLog(@"Forcing sleep!");
-//                [_machine batteryCritical];
-//            }
-//            else if (CFNumberCompare(timeToEmpty, warningThreshold, NULL) == kCFCompareLessThan) {
-//                [_machine batteryLow];
-//            }
-//        }   
+        [self poll];
+        
+        
+        [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver: self selector:@selector(didWakeNotification:) 
+                                                                   name: @"NSWorkspaceDidWakeNotification" object: nil];
+        [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver: self selector:@selector(willSleepNotification:) 
+                                                                   name: @"NSWorkspaceWillSleepNotification" object: nil];
     }
     
     return self;
 }
+
+- (void) poll {
+    // Check if we're running on AC power
+    BOOL on_ac;
+    
+    NSDictionary *batteryStatus = [self getBatteryStatus];
+    NSString * powerSourceState = [batteryStatus valueForKey:@"Power Source State"];
+    on_ac = [powerSourceState isEqualToString:@"AC Power"];
+
+    if (on_ac) {
+        [_machine powerChangeToAC];
+    } else {
+        [_machine _batteryStatusChange:(CFDictionaryRef)batteryStatus];
+    }
+    
+    if (! on_ac) {
+        // Check if we're already below the battery empty warning threshold
+
+        NSInteger sleepThreshold = sleepMinutesLeft;
+        NSInteger warningThreshold = warningMinutesLeft;
+        NSInteger timeToEmpty = [[batteryStatus valueForKey:@"Time to Empty"] integerValue];
+        
+        if (timeToEmpty <= sleepThreshold) {
+            [_machine batteryCritical];
+        }
+        else if (timeToEmpty < warningThreshold) {
+            [_machine batteryLow];
+        }
+    }   
+}
+
+- (NSString *) powerSource {
+    CFDictionaryRef batteryStatus = SCDynamicStoreCopyValue(_dynamicStore, kInternalBatteryKey);
+    CFStringRef powerSourceState = CFDictionaryGetValue(batteryStatus, CFSTR("Power Source State"));
+    return (NSString *)powerSourceState;
+}
+
+- (NSDictionary *) getBatteryStatus {
+    CFDictionaryRef batteryStatus = SCDynamicStoreCopyValue(_dynamicStore, kInternalBatteryKey);
+    return (NSDictionary *)batteryStatus;
+}
+
+- (BOOL) isCharging {
+    NSString *powerSourceState = [[self getBatteryStatus] valueForKey:@"Power Source State"];
+    return [powerSourceState isEqualToString:@"AC Power"];
+}
+
+- (BOOL) isDischarging {
+    return ![self isCharging];
+}
+
+- (NSString *) batteryStatusString {
+    NSDictionary *batteryStatus = [self getBatteryStatus];
+    NSInteger pct;
+    NSString *remain;
+    NSInteger timeToEmpty = [[batteryStatus valueForKey:@"Time to Empty"] integerValue];
+    if ([self isCharging]) {
+        remain = @"Charging";
+    }
+    else if (timeToEmpty <= 0) {
+        remain = @"Calculating…";
+    } else {
+        NSInteger hours = timeToEmpty / 60;
+        NSInteger minutes = timeToEmpty - (hours * 60);
+        remain = [NSString stringWithFormat:@"%d:%02d", hours, minutes];
+    }
+
+    NSInteger maxCapacity = [[batteryStatus valueForKey:@"Max Capacity"] integerValue];
+    NSInteger currentCapacity = [[batteryStatus valueForKey:@"Current Capacity"] integerValue];
+
+    pct = (currentCapacity * 100) / maxCapacity;
+    return [NSString stringWithFormat:@"%d%%, %@", pct, remain];
+}
+
+#pragma sleep monitoring
+
+- (void)didWakeNotification:(NSNotification *)notification {
+    NSLog(@"didWakeNotification: received NSWorkspaceDidWakeNotification");
+    [self poll];
+    [_machine hostWake];
+}
+
+- (void)willSleepNotification:(NSNotification *)notification{
+    NSLog(@"willSleepNotification: received NSWorkspaceWillSleepNotification");
+    [_machine hostSleep];
+}
+
+#pragma mark cleanup
 
 - (void)dealloc
 {

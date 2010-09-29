@@ -18,11 +18,22 @@
     
     int warningMinutesLeft;
     int sleepMinutesLeft;
+    
+    BOOL monitoringPaused;
 }
 
 
 @property (assign) int warningMinutesLeft;
 @property (assign) int sleepMinutesLeft;
 @property (retain) SleeperStateMachine *machine;
+
+@property BOOL monitoringPaused;
+
+- (NSString *) powerSource;
+- (NSDictionary *) getBatteryStatus;
+- (BOOL) isCharging;
+- (BOOL) isDischarging;
+- (NSString *) batteryStatusString;
+- (void) poll;
 
 @end

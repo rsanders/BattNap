@@ -12,12 +12,14 @@
 @class SleeperStateMachine;
 
 typedef enum {
+    STATE_PREVIOUS = -1,
     STATE_NO_CHANGE = 0,
     STATE_AC,
     STATE_BATTERY_LOW,
     STATE_BATTERY_NORMAL,
     STATE_BATTERY_CRITICAL,
-    STATE_ASLEEP
+    STATE_ASLEEP,
+    STATE_DELAY1
 } sstate_t;
 
 @protocol SleepEventHandler <NSObject>
@@ -28,6 +30,8 @@ typedef enum {
 - (sstate_t) powerChangeToBattery;
 - (sstate_t) hostWake;
 - (sstate_t) hostSleep;
+- (sstate_t) timerElapsed;
+- (sstate_t) requestDelay;
 @end
 
 @interface SleeperStateObject : NSObject <SleepEventHandler> {
@@ -63,8 +67,13 @@ typedef enum {
 }
 @end
 
+@interface SleeperStateDelay1 : SleeperStateObject {
+}
+@end
+
 @interface SleeperStateMachine : NSObject <SleepEventHandler> {
     sstate_t    state;
+    sstate_t    previous_state;
     SleeperStateObject  *handler;
     AppDelegate *delegate;
     int warningMinutesLeft;
