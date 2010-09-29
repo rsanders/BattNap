@@ -12,9 +12,7 @@
 #import "AppDelegate.h"
 
 
-static SCDynamicStoreRef _dynamicStore;
-static CFDictionaryRef _batteryStatus;
-static BOOL isPluggedIn;
+
 
 static CFStringRef kLowBatteryWarningKey = CFSTR("State:/IOKit/LowBatteryWarning");
 static CFStringRef kPowerAdapterKey = CFSTR("State:/IOKit/PowerAdapter");
@@ -129,12 +127,8 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
         _runLoopSource = SCDynamicStoreCreateRunLoopSource(kCFAllocatorDefault, _dynamicStore, 0);
         CFRunLoopAddSource(CFRunLoopGetCurrent(), _runLoopSource, kCFRunLoopDefaultMode);
         CFRelease(_runLoopSource);
-        
-        _batteryStatus = SCDynamicStoreCopyValue(_dynamicStore, kInternalBatteryKey);
-        
 
-
-        _machine = [[SleeperStateMachine alloc] initWithState:(isPluggedIn ? STATE_AC : STATE_BATTERY_NORMAL) 
+        _machine = [[SleeperStateMachine alloc] initWithState:([self isCharging] ? STATE_AC : STATE_BATTERY_NORMAL) 
                                                      delegate:_delegate];
 
 
@@ -245,6 +239,8 @@ static void scCallback(SCDynamicStoreRef store, CFArrayRef changedKeys, void *in
 
 - (void)dealloc
 {
+    [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self];
+
     if (_runLoopSource != nil) {
 		CFRunLoopRemoveSource(CFRunLoopGetCurrent(), _runLoopSource, kCFRunLoopDefaultMode);
         CFRunLoopSourceInvalidate(_runLoopSource);

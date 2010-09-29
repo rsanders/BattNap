@@ -36,6 +36,12 @@
     return self;
 }
 
+- (void) dealloc {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self];
+    self.handler = nil;
+    [super dealloc];
+}
+
 - (sstate_t) newState:(sstate_t)new_state {
     // same old same old
     if (new_state == STATE_PREVIOUS) {

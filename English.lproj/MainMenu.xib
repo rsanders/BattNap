@@ -1621,7 +1621,7 @@
 							<string key="NSTitle">Debug</string>
 							<object class="NSMutableArray" key="NSMenuItems">
 								<bool key="EncodedWithXMLCoder">YES</bool>
-								<object class="NSMenuItem" id="908784004">
+								<object class="NSMenuItem" id="659787958">
 									<reference key="NSMenu" ref="271208104"/>
 									<string key="NSTitle">Debug Mode</string>
 									<string key="NSKeyEquiv"/>
@@ -1701,7 +1701,7 @@
 				<string key="NSWindowClass">NSWindow</string>
 				<nil key="NSViewClass"/>
 				<object class="NSView" key="NSWindowView" id="966858280">
-					<nil key="NSNextResponder"/>
+					<reference key="NSNextResponder"/>
 					<int key="NSvFlags">256</int>
 					<object class="NSMutableArray" key="NSSubviews">
 						<bool key="EncodedWithXMLCoder">YES</bool>
@@ -1710,6 +1710,7 @@
 							<int key="NSvFlags">268</int>
 							<string key="NSFrame">{{110, 159}, {322, 17}}</string>
 							<reference key="NSSuperview" ref="966858280"/>
+							<reference key="NSWindow"/>
 							<reference key="NSNextKeyView" ref="593791732"/>
 							<int key="NSViewLayerContentsRedrawPolicy">2</int>
 							<bool key="NSEnabled">YES</bool>
@@ -1732,6 +1733,8 @@
 							<int key="NSvFlags">268</int>
 							<string key="NSFrame">{{375, 5}, {86, 32}}</string>
 							<reference key="NSSuperview" ref="966858280"/>
+							<reference key="NSWindow"/>
+							<reference key="NSNextKeyView"/>
 							<int key="NSViewLayerContentsRedrawPolicy">2</int>
 							<bool key="NSEnabled">YES</bool>
 							<object class="NSButtonCell" key="NSCell" id="544912099">
@@ -1765,6 +1768,7 @@
 							</object>
 							<string key="NSFrame">{{20, 82}, {65, 80.8}}</string>
 							<reference key="NSSuperview" ref="966858280"/>
+							<reference key="NSWindow"/>
 							<reference key="NSNextKeyView" ref="513584213"/>
 							<object class="NSShadow" key="NSViewShadow">
 								<double key="NSShadowBlurRadius">6</double>
@@ -1788,6 +1792,7 @@
 							<int key="NSvFlags">268</int>
 							<string key="NSFrame">{{113, 54}, {348, 90}}</string>
 							<reference key="NSSuperview" ref="966858280"/>
+							<reference key="NSWindow"/>
 							<reference key="NSNextKeyView" ref="708102341"/>
 							<int key="NSViewLayerContentsRedrawPolicy">2</int>
 							<bool key="NSEnabled">YES</bool>
@@ -1818,6 +1823,8 @@ YmVjYXVzZSBvZiBlLmcuIFBHUCBXREUuCgpieSBDdXJpb3VzIFNxdWlkA</string>
 						</object>
 					</object>
 					<string key="NSFrame">{{7, 11}, {475, 190}}</string>
+					<reference key="NSSuperview"/>
+					<reference key="NSWindow"/>
 					<reference key="NSNextKeyView" ref="194590800"/>
 					<bool key="NSViewIsLayerTreeHost">YES</bool>
 					<int key="NSViewLayerContentsRedrawPolicy">2</int>
@@ -2712,10 +2719,10 @@ YmVjYXVzZSBvZiBlLmcuIFBHUCBXREUuCgpieSBDdXJpb3VzIFNxdWlkA</string>
 				<object class="IBConnectionRecord">
 					<object class="IBBindingConnection" key="connection">
 						<string key="label">value: debugMode</string>
-						<reference key="source" ref="908784004"/>
+						<reference key="source" ref="659787958"/>
 						<reference key="destination" ref="976324537"/>
 						<object class="NSNibBindingConnector" key="connector">
-							<reference key="NSSource" ref="908784004"/>
+							<reference key="NSSource" ref="659787958"/>
 							<reference key="NSDestination" ref="976324537"/>
 							<string key="NSLabel">value: debugMode</string>
 							<string key="NSBinding">value</string>
@@ -4073,7 +4080,7 @@ YmVjYXVzZSBvZiBlLmcuIFBHUCBXREUuCgpieSBDdXJpb3VzIFNxdWlkA</string>
 							<reference ref="841283196"/>
 							<reference ref="157285751"/>
 							<reference ref="223981005"/>
-							<reference ref="908784004"/>
+							<reference ref="659787958"/>
 						</object>
 						<reference key="parent" ref="297798123"/>
 					</object>
@@ -4109,7 +4116,7 @@ YmVjYXVzZSBvZiBlLmcuIFBHUCBXREUuCgpieSBDdXJpb3VzIFNxdWlkA</string>
 					</object>
 					<object class="IBObjectRecord">
 						<int key="objectID">633</int>
-						<reference key="object" ref="908784004"/>
+						<reference key="object" ref="659787958"/>
 						<reference key="parent" ref="271208104"/>
 						<string key="objectName">Menu Item - Debug Mode</string>
 					</object>

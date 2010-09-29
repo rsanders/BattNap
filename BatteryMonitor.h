@@ -12,6 +12,8 @@
 
 @interface BatteryMonitor : NSObject {
     CFRunLoopSourceRef _runLoopSource;
+    SCDynamicStoreRef _dynamicStore;
+
     AppDelegate *_delegate;
     
     SleeperStateMachine *_machine;
